@@ -36,8 +36,8 @@ namespace averageImage {
         cout << image.size() << endl;
         Mat results(divisions, divisions, CV_64F);
 
-        int h_division = (float)(image.rows-1)/ (float)divisions;
-        int w_division = (float)(image.cols-1)/ (float)divisions;
+        float h_division = (float)(image.rows-1)/ (float)divisions;
+        float w_division = (float)(image.cols-1)/ (float)divisions;
         cout << h_division << endl;
 
         int uppery, lowery, leftx, rightx;
