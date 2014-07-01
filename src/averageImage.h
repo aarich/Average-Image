@@ -25,7 +25,7 @@ namespace averageImage {
     // 1 -- 2
     // |    |
     // 3 -- 4
-    cout << "Values: " << one << "\t" << two << "\t" << three << "\t" << four << endl;
+    // cout << "Values: " << one << "\t" << two << "\t" << three << "\t" << four << endl;
     // cout << img.at<T>(uppery, leftx);
     return four + one - two - three;
     }
@@ -51,9 +51,9 @@ namespace averageImage {
             {
                 leftx = (int) c*w_division;
                 rightx = (int) (c + 1) * w_division;
-                cout << "r: " << r << "\t" << "c: " << c << "\t" << leftx << "\t" << rightx << "\t" << uppery << "\t" << lowery << endl;
+                // cout << "r: " << r << "\t" << "c: " << c << "\t" << leftx << "\t" << rightx << "\t" << uppery << "\t" << lowery << endl;
                 mag = getMagnitude(leftx, uppery, rightx, lowery, image);
-                cout << "\tmag: " << mag << endl;
+                // cout << "\tmag: " << mag << endl;
 
                 results.at<double>(r, c) = abs(mag);
             }
