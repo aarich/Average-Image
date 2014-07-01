@@ -1,0 +1,8 @@
+Match.JPG
+images.txt
+10
+
+====================
+string 	queryImageName
+string 	fileWithTrainImages;
+int 	number of divisions

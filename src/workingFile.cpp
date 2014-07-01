@@ -1,0 +1,261 @@
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/features2d/features2d.hpp"
+#include "opencv2/contrib/contrib.hpp"
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/core/core.hpp"
+#include "opencv2/calib3d/calib3d.hpp"
+#include "cvaux.h"
+
+#include <iostream>
+#include <fstream>
+
+using namespace cv;
+using namespace std;
+
+// Print usage
+static void printPrompt( const string& applName )
+{
+    cout << "/*\n"
+         << " * Sandbox for doing LBP and and Casscade Classifier\n"
+         << " */\n" << endl;
+
+    cout << endl << "Format:\n" << endl;
+    cout << "./" << applName << " [ImageName] [FileWithMoreImages(.txt)] [Divisions]" << endl;
+    cout << endl;
+}
+  
+// Get the sum of the pixel values within a square of an image
+#define T double
+T getMagnitude(const int leftx, const int uppery, const int rightx, const int lowery, const Mat& img)
+{
+    T one = img.at<T>(uppery, leftx);//(leftx, uppery);
+    T two = img.at<T>(uppery, rightx);//(rightx, uppery);
+    T three = img.at<T>(lowery, leftx);//(leftx, lowery);
+    T four = img.at<T>(lowery,rightx);//(rightx, lowery);
+    // 1 -- 2
+    // |    |
+    // 3 -- 4
+    // cout << one << "\t" << two << "\t" << three << "\t" << four;
+    // cout << img.at<T>(uppery, leftx);
+    return four + one - two - three;
+}
+
+// Get the pixel sum image of a picture.
+Mat getPixSum(const Mat& image, const int divisions)
+{
+    Mat results(divisions, divisions, CV_64F);
+
+    int h_division = (int)(image.rows-1)/divisions;
+    int w_division = (int)(image.cols-1)/divisions;
+
+    int uppery, lowery, leftx, rightx;
+    double mag;
+
+    for (int r = 0; r < divisions; r++)
+    {
+        uppery = r*h_division;
+        lowery = (r+1)*h_division;
+        for (int c = 0; c < divisions; c++)
+        {
+            leftx = c*w_division;
+            rightx = (c + 1) * w_division;
+            // cout << "r: " << r << "\t" << "c: " << c << "\t" << leftx << "\t" << rightx << "\t" << uppery << "\t" << lowery;// << endl;
+            mag = getMagnitude(leftx, uppery, rightx, lowery, image);
+            // cout << "\tmag: " << mag << endl;
+
+            results.at<double>(r, c) = abs(mag);
+        }
+    }
+    // cout << "Results:" << endl << results << endl;
+    normalize(results, results, 0, 255, NORM_MINMAX, CV_64F);
+
+    // cout << results << endl;
+    
+    Mat results2(results.size(), CV_32S);
+
+    for (int r = 0; r < results.rows; r++)
+    {
+        for (int c = 0; c < results.cols; c++)
+        {
+            results2.at<int>(r,c) = (int)results.at<double>(r,c);
+        }
+    }
+
+    return results2;
+}
+
+// Determine Similarity of two images. Only works for matrices of the same size, for now.
+float determineSimilarity (const Mat& mat1, const Mat& mat2)
+{
+    if (mat1.size() != mat2.size())
+    {
+        cout << "Matrices are not the same size";
+        return -1;
+    } 
+
+    int difference = 0;
+
+    for (int r = 0; r < mat1.rows; r++)
+    {
+        for (int c = 0; c < mat1.cols; c++)
+        {
+            difference += abs(mat1.at<int>(r,c) - mat2.at<int>(r,c));
+        }
+    }
+
+    // Calculate mean difference
+    return difference/(mat1.rows * mat1.cols);
+}
+
+static void readTrainFilenames( const string& filename, string& dirName, vector<string>& trainFilenames )
+{
+    trainFilenames.clear();
+
+    ifstream file( filename.c_str() );
+    if ( !file.is_open() )
+        return;
+
+    size_t pos = filename.rfind('\\');
+    char dlmtr = '\\';
+    if (pos == string::npos)
+    {
+        pos = filename.rfind('/');
+        dlmtr = '/';
+    }
+    dirName = pos == string::npos ? "" : filename.substr(0, pos) + dlmtr;
+
+    while( !file.eof() )
+    {
+        string str; getline( file, str );
+        if( str.empty() ) break;
+        trainFilenames.push_back(str);
+    }
+    file.close();
+}
+
+static bool readImages( const string& queryImageName, const string& trainFilename,
+                 Mat& queryImage, vector <Mat>& trainImages, vector<string>& trainImageNames )
+{
+    cout << "< Reading the images..." << endl;
+    queryImage = imread( queryImageName, CV_LOAD_IMAGE_GRAYSCALE);
+    if( queryImage.empty() )
+    {
+        cout << "Query image can not be read." << endl << ">" << endl;
+        return false;
+    }
+    string trainDirName;
+    readTrainFilenames( trainFilename, trainDirName, trainImageNames );
+    if( trainImageNames.empty() )
+    {
+        cout << "matching image filenames can not be read." << endl << ">" << endl;
+        return false;
+    }
+    int readImageCount = 0;
+    for( size_t i = 0; i < trainImageNames.size(); i++ )
+    {
+        string filename = trainDirName + trainImageNames[i];
+        Mat img = imread( filename, CV_LOAD_IMAGE_GRAYSCALE );
+        if( img.empty() )
+            cout << "image " << filename << " can not be read." << endl;
+        else
+            readImageCount++;
+        trainImages.push_back( img );
+    }
+    if( !readImageCount )
+    {
+        cout << "All images can not be read." << endl << ">" << endl;
+        return false;
+    }
+    else
+        cout << readImageCount << " matching images were read." << endl;
+    cout << ">" << endl;
+
+    return true;
+}
+
+
+int main(int argc, char** argv)
+{
+    if( argc < 4 )
+    {
+        printPrompt( argv[0] );
+        return -1;
+    }
+
+    cv::initModule_nonfree();
+
+    string queryImageName = argv[1];
+    string fileWithTrainImages = argv[2];
+    int divs = atoi(argv[3]);
+
+    Mat queryImage;
+    vector<Mat> matchingImages;
+    vector<string> matchingImageNames;
+    if( !readImages( queryImageName, fileWithTrainImages, queryImage, matchingImages, matchingImageNames) )
+    {
+        printPrompt( argv[0] );
+        return -1;
+    }
+
+    // cout << "< Computing integrals \n";
+
+    Mat iImage1;
+    integral(queryImage, iImage1, CV_64F);
+
+    vector<Mat> imatchingImages;
+    for(size_t i = 0; i < matchingImages.size(); i++)
+    {
+        Mat img;
+        integral(matchingImages[i], img, CV_64F);
+        imatchingImages.push_back(img);
+    }
+    // cout << "> \n< Computing Pixel Sums\n";
+
+    Rect ROI (1, 1, iImage1.cols-1, iImage1.rows-1);
+    Mat cropped = iImage1(ROI);
+    Mat pixsum1 = getPixSum(cropped, divs);
+
+    imwrite("query.jpg", pixsum1);
+
+    vector<Mat> pixsumMatchingImages;
+    for(size_t i = 0; i < matchingImages.size(); i++)
+    {
+        Mat current = imatchingImages[i];
+        Rect ROI (1, 1, current.cols-1, current.rows-1);
+        Mat cropped = current(ROI);
+        Mat pixsum;
+        pixsum = getPixSum(current, divs);
+        pixsumMatchingImages.push_back(pixsum);
+        string fn = "sum_" + matchingImageNames[i];
+        imwrite(fn, pixsum);
+    }
+
+    // cout << ">\n< Computing simularity\n";
+
+    float best = 500;
+    string bestnm;
+
+    TickMeter tm;
+    tm.start();
+
+    // Calculate simularity
+    for(size_t i = 0; i < matchingImages.size(); i++)
+    {
+        float sim = determineSimilarity(pixsum1, pixsumMatchingImages[i]);
+        cout << matchingImageNames[i] << " similarity: " << (int) sim << endl;
+        if (sim < best)
+        {
+            best = sim;
+            bestnm = matchingImageNames[i];
+        }
+    }
+
+    tm.stop();
+    double matchTime = tm.getTimeMilli();
+
+    cout << endl << bestnm << " was the closest match at " << divs << " divisions.\n\n";
+
+    cout << "Matching time: " << matchTime << "ms. Per Image: " << matchTime/matchingImageNames.size() << " ms." << endl;
+
+    return 0;
+}
