@@ -36,10 +36,7 @@ int main(int argc, char** argv)
 
     cv::initModule_nonfree();
 
-    Mat image;
-
-    image = imread(argv[1]);
-
+    Mat image = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
     int divs = atoi(argv[2]);
 
     cout << "< Computing integral Image ... \n";
@@ -51,6 +48,7 @@ int main(int argc, char** argv)
 
     Rect ROI (1, 1, iImage.cols-1, iImage.rows-1);
     Mat cropped = iImage(ROI);
+
     Mat pixsum = getPixSum(cropped, divs);
 
     imwrite("pixsum.jpg", pixsum);

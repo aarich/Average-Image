@@ -18,27 +18,27 @@ namespace averageImage {
     #define T double
     T getMagnitude(const int leftx, const int uppery, const int rightx, const int lowery, const Mat& img)
     {
-    T one = img.at<T>(uppery, leftx);//(leftx, uppery);
-    T two = img.at<T>(uppery, rightx);//(rightx, uppery);
-    T three = img.at<T>(lowery, leftx);//(leftx, lowery);
-    T four = img.at<T>(lowery,rightx);//(rightx, lowery);
-    // 1 -- 2
-    // |    |
-    // 3 -- 4
-    // cout << "Values: " << one << "\t" << two << "\t" << three << "\t" << four << endl;
-    // cout << img.at<T>(uppery, leftx);
-    return four + one - two - three;
+        double area = (double) ((rightx - leftx) * (lowery - uppery));
+        T one = (T) img.at<T>(uppery, leftx) / area;//(leftx, uppery);
+        T two = (T) img.at<T>(uppery, rightx) / area;//(rightx, uppery);
+        T three = (T) img.at<T>(lowery, leftx) / area;//(leftx, lowery);
+        T four = (T) img.at<T>(lowery,rightx) / area;//(rightx, lowery);
+        // 1 -- 2
+        // |    |
+        // 3 -- 4
+        // cout << "Values: " << one << "\t" << two << "\t" << three << "\t" << four << endl;
+        // cout << img.at<T>(uppery, leftx);
+        // cout << four + one - two - three  << "\t";
+        return four + one - two - three;
     }
 
-    // Get the pixel sum image of a picture.
+    // Get the pixel sum image of an integral picture.
     Mat getPixSum(const Mat& image, const int divisions)
     {
-        cout << image.size() << endl;
         Mat results(divisions, divisions, CV_64F);
 
         float h_division = (float)(image.rows-1)/ (float)divisions;
         float w_division = (float)(image.cols-1)/ (float)divisions;
-        cout << h_division << endl;
 
         int uppery, lowery, leftx, rightx;
         double mag;
@@ -55,13 +55,11 @@ namespace averageImage {
                 mag = getMagnitude(leftx, uppery, rightx, lowery, image);
                 // cout << "\tmag: " << mag << endl;
 
-                results.at<double>(r, c) = abs(mag);
+                results.at<double>(r, c) = mag;
             }
         }
         // cout << "Results:" << endl << results << endl;
         normalize(results, results, 0, 255, NORM_MINMAX, CV_64F);
-
-        // cout << results << endl;
         
         Mat results2(results.size(), CV_32S);
 
@@ -73,7 +71,7 @@ namespace averageImage {
             }
         }
 
-        cout << results2.size();
+        // cout << "Normalized int Results:\n" << results2 << endl;
 
         return results2;
     }
